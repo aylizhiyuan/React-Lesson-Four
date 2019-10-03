@@ -1,5 +1,8 @@
 import * as types from '../action-types';
 export default function(state={items:[],newType:'all'},action){
+  //action就是我们调用方法的时候返回的那个对象
+  //这个对象里面的type指定我们调用dispatch里面的那个类型
+  //text是我们的参数
   switch(action.type){
     case types.ADD_TODO://{type:ADD_TODO,text}
       return {...state,items:[...state.items,{text:action.text,completed:false}]};

@@ -25,8 +25,10 @@ export default function(mapStateToProps,mapDispatchToProps){
         if(typeof mapDispatchToProps == 'function'){
           actions = mapDispatchToProps(this.store.disaptch);
         }else if(typeof mapDispatchToProps == 'object'){
+          //mapDispatchToProps是{add_todo:function(text){return {type:types.ADD_TODO,text}}}
+          //this.store.dispatch是一个触发状态变化的函数
+          //这两个东西是怎么弄到一块去的，是通过bindActionsCreators来结合的
           actions = bindActionsCreators(mapDispatchToProps,this.store.dispatch);
-
         }
         return <WrapedComponent {...this.state} {...actions}/>
       }
