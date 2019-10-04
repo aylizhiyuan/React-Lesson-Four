@@ -10,6 +10,7 @@ export default function(...middlewares){//middleware 是应用的中间件  crea
       }
       middlewares = middlewares.map(middleware=>middleware(middlewareAPI));
       dispatch = compose(...middlewares)(store.dispatch);
+      //这里返回新的dispatch的逻辑，解决了中间件的问题
       return {...store,dispatch};
     }
   }

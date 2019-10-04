@@ -37,6 +37,6 @@ let promise = ({dispatch,getState})=>next=>action=>{
 // if(enhancer && typeof enhancer == 'function'){
 //     return enhancer(createStore)(reducer);
 // }
-let store = createStore(reducers,{anumber:0},applyMiddleware(promise,thunk,logger));
+let store = createStore(reducers,{anumber:10},applyMiddleware(promise,thunk,logger));
 window.store = store;
 export default store
