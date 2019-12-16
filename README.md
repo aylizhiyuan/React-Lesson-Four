@@ -326,6 +326,9 @@ reducer接受两个参数，一个是state，就是我们的数据，另外一�
 
 接下来我们来看applyMiddleware的实现
 
+        //仔细理解 applyMiddleware(promise,thunk,logger)(createStore)(reducer)
+        //你就知道里面对应的是什么了
+
         import compose from './compose';
         export default function(...middlewares){//middleware 是应用的中间件  createStore用来创建仓库 reducer
         return function (createStore){
@@ -343,8 +346,89 @@ reducer接受两个参数，一个是state，就是我们的数据，另外一�
             }
         }
         }
-        
+中间件你可以理解为返回一个新的dispatch,加入我们的逻辑,或者是在action的时候，添加新的任务,用户调用action ---> 触发dispatch ---> 根据state和action传入到reducer中 ---> reducer返回新的state供用户使用 ----> 用户可以根据state的改变去主动的触发视图更新 ----> 任何用户都可以调用
+
+
+        let logger = function({dispatch,getState}){
+        //next是老的原生的dispatch    
+        return function(next){
+            return function(action){
+            console.log('老状态1 ',getState());
+            next(action);//派发动作
+            console.log('新状态1 ',getState());
+            let newState = getState();
+            if(newState.number == 10){
+                dispatch({type:'INCREMENT',payload:-10});
+            }
+            }
+        }
+        }
+
+接下来我们来讨论异步的情况,异步的话只能使用中间件处理完毕之后
+
+            let thunk = ({dispatch,getState})=>next=>action=>{
+            if(typeof action == 'function'){
+                action(dispatch,getState);
+            }else{
+                next(action);
+            }
+            }
+            let promise = ({dispatch,getState})=>next=>action=>{
+            if(action.then && typeof action.then == 'function'){
+                action.then(dispatch);
+            }else if(action.payload&& action.payload.then&& typeof action.payload.then == 'function'){
+                action.payload.then(payload=>dispatch({...action,payload}),payload=>dispatch({...action,payload}));
+            }else{
+                next(action);
+            }
+            }
+
+下面就是对应的action函数，注意是函数了，不是对象了
+
+        thunkIncrement(){
+            return function(dispatch,getState){
+            setTimeout(function(){
+                dispatch({type:types.AINCREMENT,payload:1});
+            },1000);
+            }
+        },
+        promiseIncrement(){
+            return new Promise(function(resolve,reject){
+            setTimeout(function(){
+                resolve({type:types.AINCREMENT,payload:1});
+            },1000);
+            });
+        },
+
+
+
 ### 8.增加异步中间件saga
+
+1. redux-saga的工作原理
+
+- sagas采用generator函数来yield Effects
+- generator函数的作用可以暂停执行，再次执行的时候可以从上次暂停的地方继续执行
+- Effect是一个简单的对象，该对象包含了一些给middleware解释执行的信息
+- 你可以通过使用fork,call,take,put,cancel等来创建effects
+
+2. redux-saga的分类
+
+- woker saga做主要的工作,入调用API，进行异步请求
+- watcher saga监听被dispatch的actions,当接收到actions的时候调用woker执行任务
+- root saga为入口
+
+3. API
+
+中间件的API
+
+- createSagaMiddleware(...sagas)
+- middleware.run(saga,...args)
+
+saga的
+
+- takeEvery(pattern,saga,..args)
+
+
 
 
 
