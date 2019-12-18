@@ -1,4 +1,4 @@
-# redux + react-redux + redux-middleware + redux-saga + dva + antd
+# redux + react-redux + redux-middleware + redux-saga 
 
 父子组件传值一直是个问题，父组件想给子组件传值，那么只需要在父组件中调用子组件的位置以属性的形式传入即可，在子组件中通过this.props获取传递到的值即可
 
