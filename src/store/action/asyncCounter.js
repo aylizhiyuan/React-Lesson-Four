@@ -1,6 +1,7 @@
 //这里定义我们的actions封装触发函数
 import * as types from '../action-types'
 export default {
+  //普通的action会触发dispatch,在reducer里面直接修改数据
   aincrement(){
     return {type:types.AINCREMENT,payload:1}
   },

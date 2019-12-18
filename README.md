@@ -417,26 +417,203 @@ reducer接受两个参数，一个是state，就是我们的数据，另外一�
 - watcher saga监听被dispatch的actions,当接收到actions的时候调用woker执行任务
 - root saga为入口
 
-3. API
-
-中间件的API
+3. 中间件的API
 
 - createSagaMiddleware(...sagas)
 - middleware.run(saga,...args)
 
-saga的
+4. 调用顺序
 
-- takeEvery(pattern,saga,..args)
+- rootsaga被middleware调用
+- rootsaga中yield引用watchsaga
+- watchsaga中调用具体的worker来执行异步操作
+
+5. 常用的API
+
+- take获取指定类型的action
 
 
+- takeEvery 你可以理解为我监听一个异步的action
+
+        import {call,put} from 'redux-saga/effects'
+        export function* fetchData(action){
+            try {
+                const data = yield call(Api.fetchUser,action.payload)
+                //触发的实际是同步的
+                yield put({type:"FETCH_SUCCEEDED",data})
+            }catch(error){
+                yield put({type:"FETCH_FAILED",error})
+            }
+        }
+        每次在FETCH_REQUESTED 的action发起的时候启动这个任务
+        import {takeEvery} from 'redux-saga'
+        function *watchFetchData(){
+            //允许多个fetchData实例同时启动
+            yiled* takeEvery('FETCH_REQUESTED',fetchData)
+        }
 
 
+- takelatest 多个action同时并行的时候，只执行最后一个，自动cancel前面take的actions
 
 
+- call阻塞式异步调用，第一个参数是调用的generator函数，后面的参数是传递的参数，会阻塞直到promise返回结果。如果阻塞的时候有其他的action,那么这些action都会错过，不会被执行
 
-### 9. dva的写法
-                
-### 10. antd的里面的写法---umi构建项目
+
+- fork非阻塞时候调用，可以理解为子任务单独处理，每个action都会得到处理，不会错过执行的时机
+
+
+- put相当于dispatch函数，用于generator中dispatch action
+
+
+- cancel可以取消fork出来的子任务，将在当前执行的任务中抛出一个saga类型的异常，可以通过try catch捕获到，但是这个错误并不会向上冒泡
+
+
+- race返回先完成的任务，cancel其他的
+
+
+> 登录注册案例
+
+        ----- store  //我们的仓库
+                ---- action-types.js 我们的action类型
+                ---- actions.js 我们的action
+                ---- index.js 创建store的地方
+                ---- reducers 修改store的地方
+        ----- saga.js //rootsaga
+        ----- index.js // 根组件注入的地方
+        ----- components //组件
+
+
+- index.js 根组件注入的地方
+
+        import React,{Component} from 'react'
+        import ReactDOM from 'react-dom'
+        import Login from './components/Login'
+        import Logout from './components/Logout'
+        import {Provider} from 'react-redux'
+        //我们创建好的store仓库
+        import store from './store'
+        import {Route,Switch,Redireact} from 'react-router-dom'
+        ReactDOM.render(
+            <Provider store={store}>
+                <Switch>
+                    <Route path='/login' component={Login}>
+                    <Route path='/logout' component={Logout}>
+                    <Redirect to='/login'>
+                </Switch>
+            </Provider>
+        ,document.querySelecotr('#root'));
+
+- index.js 创建store的地方
+
+        import {createStore,applyMiddleware,componse} from 'redux'
+        //引入我们的reducers
+        import reducers from './reducers'
+        //处理异步的action
+        import {rootSaga} from './sagas'
+        //创建一个可以帮你运行saga的中间件
+        let sagaMiddleware = createSagaMiddleware()
+        let store = createStore(reducers,applyMiddleware(sagaMiddleware));
+        sagaMiddleware.run(rootSaga,store);
+        export default store;
+
+
+- index.js 创建改变state的reducer
+
+        import * as types from '../action-types'
+        import {combinReducers} from 'redux'
+        function user(state={token:'',error:''},action){
+            switch(action.type){
+                case types.LOGIN_SUCCESS:
+                    return {...state,token:action.token}
+                case types.LOGIN.ERROR:
+                    return {...state,error:action.error}; 
+                default:
+                    return state;       
+            }
+        }
+        export default combinReducers({
+            user
+        })
+
+- action-types.js 触发的事件
+
+        export const LOGIN_REQUEST = 'LOGIN_REQUEST';
+        export const LOGIN_SUCCESS = 'LOGIN_SUCCESS';
+        export const LOGIN_ERROR = 'LOGIN_ERROR';
+
+        export const LOGOUT_REQUEST = 'LOGOUT_REQUEST';
+        export const LOGOUT_SUCCESS = 'LOGOUT_SUCCESS';
+        export const LOGOUT_ERROR = 'LOGOUT_ERROR';
+
+- actions.js 我们的action会返回一个对象
+
+        import * as types from './action-types';
+        export default {
+            //这里面其实是异步的任务,saga处理
+            //返回的这个type是在action中不存在的
+            login(username,password){
+                return {type:types.LOGIN_REQUEST,username,password};
+            },
+            logout(){
+                return {type:types.LOGOUT_REQUEST};
+            }
+        }
+
+- saga.js 我们的异步管理
+
+
+            import 'babel-polyfill';
+            import {takeEvery,all,call,put,take} from 'redux-saga/effects';
+            import * as types from './store/action-types';
+            import {push} from 'react-router-redux';
+            let Api = {
+            login(username,password){
+                return new Promise(function(resolve,reject){
+                    //setTimeout(function(){
+                    resolve(username+password);
+                    console.log('login resolve');
+                    // },1000);
+                });
+            }
+            }
+            function* login(username,password){
+            try{
+                let token = yield call(Api.login,username,password);
+                //let token = yield Api.login(username,password);
+
+                console.log('token',token);
+                yield put({type:types.LOGIN_SUCCESS,token});
+                //跳到个人页
+                yield put(push('/logout')); 
+                return token;
+            }catch(error){
+                put({type:types.LOGIN_ERROR,error});
+            }
+            }
+            function* loginFlow(){
+            while(true){
+                //监听未来的action,用户在退出的时候，必须等待take的任务是已经被触发了
+                let {username,password} = yield take(types.LOGIN_REQUEST);
+                let token = yield login(username,password);
+                if(token){
+                yield take(types.LOGOUT_REQUEST);
+                //跳回登录
+                yield put(push('/login')); 
+                }
+            }
+            }
+            function* watchAction(getState){
+                yield takeEvery('*',function* (action){
+                console.log(getState());
+                console.log(action);
+                });
+            
+            }
+            export function* rootSaga({getState}){
+            yield all([loginFlow(),watchAction(getState)]);
+            }
+
+
 
 
 
